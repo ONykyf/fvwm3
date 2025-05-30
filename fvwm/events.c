@@ -1788,9 +1788,11 @@ static void monitor_update_ewmh(void)
 	mref = RB_MIN(monitors, &monitor_q);
 
 	RB_FOREACH(m, monitors, &monitor_q) {
-		if (m->flags & MONITOR_CHANGED) {
+		if (m->flags == MONITOR_CHANGED) {
+			apply_desktops_monitor(m);
+			calculate_page_sizes(m, mref->dx, mref->dy);
+			initPanFrames(m);
 			m->flags &= ~MONITOR_CHANGED;
-			continue;
 		}
 		if (m->flags & MONITOR_NEW) {
 			fvwm_debug(__func__, "Applying EWMH changes to new %s",
@@ -4129,6 +4131,12 @@ void dispatch_event(XEvent *e)
 
 	switch (e->type - randr_event) {
 	case RRScreenChangeNotify:
+		XRRUpdateConfiguration(e);
+		monitor_output_change(e->xany.display, NULL);
+		monitor_update_ewmh();
+		monitor_emit_broadcast();
+		initPanFrames(NULL);
+
 		/* Avoid processing identical RandR events twice. */
 		if (e->xany.serial == prev_serial)
 		{
@@ -4138,11 +4146,6 @@ void dispatch_event(XEvent *e)
 		}
 		prev_serial = e->xany.serial;
 
-		XRRUpdateConfiguration(e);
-		monitor_output_change(e->xany.display, NULL);
-		monitor_update_ewmh();
-		monitor_emit_broadcast();
-		initPanFrames(NULL);
 		break;
 	}
 
