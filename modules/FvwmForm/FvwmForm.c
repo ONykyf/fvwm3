@@ -2136,40 +2136,28 @@ char* find_nth_UTF8_char(char *str, char *before,
 {
     char *pstr = str; /* previous valid char */
     int i = 0; /* counter of chars got */
-    int l = 1; /* length of last chunk got */
+    int l = 0; /* length of the last chunk got */
     if (str == NULL || (before && (before <= str))) {
 	if (num) *num = -1;
 	if (len) *len = 0;
 	return NULL;
     }
 
-    while (1) {
-	if (*str == '\0' || l == 0
-	    || (before && str >= before)
-	    || (num && *num >= 0 && i > *num)) {
-		if (num && *num >= 0 && i <= *num) {
-		/* ended prematurely => return '\0' of length zero */
-		    pstr = str;
-		    l = 0;
-		}
-		else if (l == 0 || i == 0) {
-		/* invalid UTF-8 char or '\0' */
-		    l = (int)(str-pstr);
-		}
-		if (num) *num = i - 1;
-		if (len) *len = l;
-		return pstr;
-	}
-
+    while ((*str != '\0')
+	    && (!before || str < before)
+	    && (!num || *num < 0 || i <= *num))
+    {
 #if 0   /* no UTF-8, single-byte locale */
 	pstr = str;
 	str++;
 	i++;
+	l = 1;
 #else   /* parse UTF-8 string */
 	if ((str[0] & 0xe0) == 0xc0)        /* two-byte */
 	{
 	    if ((str[1] & 0xc0) != 0x80) {
 		l = 0;
+		break;
 	    }
 	    else {
 		l = 2;
@@ -2182,9 +2170,11 @@ char* find_nth_UTF8_char(char *str, char *before,
 	{
 	    if ((str[1] & 0xc0) != 0x80) {
 		l = 0;
+		break;
 	    }
 	    else if ((str[2] & 0xc0) != 0x80) {
 		l = 0;
+		break;
 	    }
 	    else {
 		l = 3;
@@ -2197,12 +2187,15 @@ char* find_nth_UTF8_char(char *str, char *before,
 	{
 	    if ((str[1] & 0xc0) != 0x80) {
 		l = 0;
+		break;
 	    }
 	    else if ((str[2] & 0xc0) != 0x80) {
 		l = 0;
+		break;
 	    }
 	    else if ((str[3] & 0xc0) != 0x80) {
 		l = 0;
+		break;
 	    }
 	    else {
 		l = 4;
@@ -2219,6 +2212,7 @@ char* find_nth_UTF8_char(char *str, char *before,
 		    (*str != '\n') &&
 		    (*str != '\f'))) {
 		l = 0;
+		break;
 	    }
 	    else {
 		l = 1;
@@ -2227,9 +2221,21 @@ char* find_nth_UTF8_char(char *str, char *before,
 		i++;
 	    }
 	}
+
 #endif
     }
-    return NULL; /* Sentinel */
+
+    if (num && *num >= 0 && i <= *num) {
+    /* ended prematurely => return '\0' of length zero */
+	pstr = str;
+	l = 0;
+    }
+    else if ((l == 0) || (*str == '\0')) { /* invalid UTF-8 char or '\0' */
+	l = (int)(str-pstr); /* one step back => return last valid char */
+    }
+    if (num) *num = i - 1;
+    if (len) *len = l;
+    return pstr;
 }
 
 /* open the windows */
